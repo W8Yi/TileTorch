@@ -12,6 +12,7 @@ from tqdm import tqdm
 
 from .filters import compute_metrics  # metric impl lives in filters.py
 from . import vis  # for preview thumbnail
+from .sinks import TileSink
 
 # ---------------------------
 # Data container
@@ -260,3 +261,68 @@ def _write_index_csv(path: str | Path, records: List[TileRecord]) -> None:
         writer.writeheader()
         for r in records:
             writer.writerow(asdict(r))
+
+# ---------------------------
+# Public API: tiling to sink (e.g. WebDataset shards)
+# ---------------------------
+
+def extract_tiles_to_sink(
+    slide_path: str,
+    sink: TileSink,
+    tile_size: int = 256,
+    level: int = 0,
+    overlap: int = 0,
+    keep_edge: bool = False,
+    filter_fn: Optional[Callable[[Image.Image, Dict[str, float]], bool]] = None,
+    filter_kwargs: Optional[Dict] = None,
+    progress: bool = True,
+) -> List[TileRecord]:
+    """
+    Same as extract_tiles, but writes each kept tile to a user-provided sink (FileSink, WebDatasetSink, ...).
+    """
+    slide_path = str(slide_path)
+    slide_id = Path(slide_path).stem
+    slide = openslide.OpenSlide(slide_path)
+    try:
+        if level < 0 or level >= len(slide.level_dimensions):
+            raise ValueError(f"Requested level={level}, but slide has {len(slide.level_dimensions)} levels.")
+        width, height = slide.level_dimensions[level]
+        coords = list(_generate_grid(width, height, tile_size, overlap, keep_edge=keep_edge))
+        iterator = tqdm(coords, desc=f"Tiling {slide_id} (L{level})") if progress else coords
+
+        filt = filter_fn or default_tile_filter
+        fkw = filter_kwargs or {}
+        index: List[TileRecord] = []
+
+        for x, y in iterator:
+            region = slide.read_region((x, y), level, (tile_size, tile_size)).convert("RGB")
+            if region.size != (tile_size, tile_size):
+                continue
+            metrics = compute_metrics(region)
+            if not filt(region, metrics, **fkw):
+                continue
+
+            key = f"{slide_id}_x{x}_y{y}_lv{level}_sz{tile_size}"
+            meta = {
+                "slide_id": slide_id, "x": x, "y": y, "level": level, "tile_size": tile_size,
+                **metrics,
+            }
+            sink_uri = sink.append(region, meta, key)  # file path or shard:key
+
+            index.append(
+                TileRecord(
+                    slide_id=slide_id,
+                    tile_path=str(sink_uri),
+                    x=x, y=y,
+                    level=level, tile_size=tile_size,
+                    tissue_frac=float(metrics.get("tissue_frac", 0.0)),
+                    entropy=float(metrics.get("entropy", 0.0)),
+                )
+            )
+        return index
+    finally:
+        slide.close()
+        try:
+            sink.close()
+        except Exception:
+            pass

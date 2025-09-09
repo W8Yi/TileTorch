@@ -6,12 +6,13 @@ TileTorch: Whole Slide Image tiling, dataset building, and training utilities.
 __version__ = "0.1.0"
 
 # Expose key public functions
-from .tiling import extract_tiles
-from .dataset import TileDataset
-from .training import train_model
+from .tiling import extract_tiles, extract_tiles_to_sink
+# from .dataset import TileDataset
+# from .training import train_model
 
 __all__ = [
     "extract_tiles",
+    "extract_tiles_to_sink",
     "TileDataset",
     "train_model",
     "__version__",

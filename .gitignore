@@ -1,3 +1,6 @@
 # .gitignore
 test.ipynb
 blueprint.txt
+out/
+__pycache__/
+out_demo/
