@@ -2,7 +2,7 @@
 name = "tiletorch"
 version = "0.1.0"
 description = "WSI tiling, dataset building, and training utilities for histopathology."
-authors = [{ name = "W8Yi Q", email = "w8yi@outlook.com" }]
+authors = ["W8Yi Q <w8yi@outlook.com>"]
 readme = "README.md"
 license = "MIT"
 homepage = "https://github.com/W8Yi/TileTorch"
@@ -12,7 +12,7 @@ packages = [{ include = "tiletorch", from = "src" }]
 # If you publish to PyPI later, keep the name lowercase and unique.
 
 [tool.poetry.dependencies]
-python = ">=3.12,<3.13"
+python = ">=3.12"
 
 # Core
 numpy = "^2.0"
